@@ -22,5 +22,6 @@ urlpatterns = [
     path('discovery/<policy_id>', views.discovery_view, name='discovery'),
     path('all_tuning/', views.all_tuning, name='all_tuning'),
     path('all_in/', views.all_in_view, name='all_in'),
+    path('run_tuning/', views.run_tuning, name='run_tuning'),
 
 ]

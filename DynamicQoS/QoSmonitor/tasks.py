@@ -1,3 +1,5 @@
+from itertools import groupby
+
 from background_task import background
 
 from QoSmanager.models import *
@@ -197,7 +199,7 @@ def all_in_task(topology_id, policy_id, start_time):
     a = Policy.objects.get(id=policy_id)
     devices = Device.objects.filter(topology_ref_id=topo)
     for device in devices:
-        print("set the policy ref in device: "+device.hostname)
+        print("set the policy ref in device: " + device.hostname)
         device.policy_ref = a
         device.save()
     print("policy In creation")
@@ -423,3 +425,171 @@ def all_in_task(topology_id, policy_id, start_time):
     policy = Policy.objects.get(id=policy_id)
     policy.deploy = True
     policy.save()
+
+
+def retrieve_monitoring():
+    url = "http://127.0.0.1:8000/api/v1/flowtabletworates?topology=test&time_start=2019-09-10%2014:41:00&time_end=2019-09-14%2014:41:00"
+    r = requests.get(url)
+    # print(r.json())
+    data = r.json()
+    dict = {}
+
+    for elem in data['data']:
+        if elem[1] not in dict:
+            dict[elem[1]] = []
+        dict[elem[1]].append(elem[2:])
+
+    # for k in dict:
+    #     if dict[k][0] not in dict2:
+    #         dict2[dict[k][0]] = []
+    #     dict2[dict[k][0]].append(dict[k][0:])
+    for k in dict:
+        dict2 = {}
+        for elem in dict[k]:
+            if elem[0] not in dict2:
+                dict2[elem[0]] = []
+            dict2[elem[0]].append(elem[7:])
+        dict[k] = dict2
+    for k in dict:
+        for e in dict[k]:
+            dict2 = {}
+            for elem in dict[k][e]:
+                if elem[0] not in dict2:
+                    dict2[elem[0]] = []
+                dict2[elem[0]].append(elem[0:])
+            dict[k][e] = dict2
+
+    class_4 = ['152', '144', '136']
+    class_3 = ['120', '112', '104']
+
+    for device in dict:
+        dev = Device.objects.get(topology_ref_id=1, hostname=device)
+        print(dev)
+        for interface in dict[device]:
+            port = Interface.objects.filter(egress=True, device_ref=dev, interface_name=interface) | \
+                   Interface.objects.filter(wan=True, device_ref=dev, interface_name=interface)
+            sum_4 = 0
+            sum_3 = 0
+            print("-----------------------------")
+            if len(port) != 0:
+                print(port[0])
+                for tos in dict[device][interface]:
+                    if str(tos) in class_4 or class_3:
+                        policy = port[0].policy_out_ref
+                        print("the policy", policy)
+                        regs = RegroupementClass.objects.filter(policy_out=policy, group__priority__in=["4", "3"])
+                        classe = []
+                        for reg in regs:
+                            if tos == 152:
+                                classe = Dscp.objects.filter(regroupement_class=reg, dscp_value="AF43")
+                            elif tos == 144:
+                                classe = Dscp.objects.filter(regroupement_class=reg, dscp_value="AF43")
+                            elif tos == 136:
+                                classe = Dscp.objects.filter(regroupement_class=reg, dscp_value="AF42")
+
+                            elif tos == 120:
+                                classe = Dscp.objects.filter(regroupement_class=reg, dscp_value="AF33")
+                            elif tos == 112:
+                                classe = Dscp.objects.filter(regroupement_class=reg, dscp_value="AF32")
+                            elif tos == 104:
+                                classe = Dscp.objects.filter(regroupement_class=reg, dscp_value="AF31")
+                            if len(classe) != 0:
+
+                                print("-----------------------------")
+                                print(tos)
+
+                                sum = 0
+                                loss_incr = 0
+                                delay_incr = 0
+                                jitter_incr = 0
+                                sum_delay = 0
+                                sum_jitter = 0
+                                sum_loss = 0
+                                for i in dict[device][interface][tos]:
+                                    print("the packet loss  is :", i[7])
+                                    print("the jitter  is :", i[6])
+                                    print("the delay  is :", i[5])
+                                    sum += int(i[2])
+                                    if str(i[5]).isdigit():
+                                        delay_incr += 1
+                                        sum_delay += int(i[5])
+                                    if str(i[6]).isdigit():
+                                        jitter_incr += 1
+                                        sum_jitter += int(i[6])
+                                    if str(i[7]).isdigit():
+                                        loss_incr += 1
+                                        sum_loss += int(i[7])
+                                    if str(tos) in class_4:
+                                        print("class 4")
+                                        sum_4 += sum
+                                    elif str(tos) in class_3:
+                                        print("class 3")
+                                        sum_3 += sum
+                                    else:
+                                        print(tos)
+
+                                print("the sum for this tos ", tos)
+                                print(sum)
+                                print("the delay average")
+                                if delay_incr != 0:
+                                    print(sum_delay / delay_incr)
+                                    classe[0].delay = round(sum_delay / delay_incr)
+                                    classe[0].save()
+                                else:
+                                    print("devision par 0")
+                                print("the loss average")
+                                if loss_incr != 0:
+                                    print(sum_loss / loss_incr)
+                                    classe[0].loss = round(sum_loss / loss_incr)
+                                    classe[0].save()
+                                else:
+                                    print("devision par 0")
+
+                            if reg.group.priority == "4":
+                                reg.bits = round(sum_4)
+                                reg.save()
+                            if reg.group.priority == "3":
+                                reg.bits = round(sum_3)
+                                reg.save()
+
+
+@background(queue='q9')
+def tuning_task():
+    print('start')
+    c = 0
+    while c <= 15:
+        c += 1
+        interfaces = Interface.objects.filter(wan=True)
+        print(len(interfaces))
+        policyout = interfaces[0].policy_out_ref
+        policy = policyout.policy_ref
+        a = 72
+        regs = RegroupementClass.objects.filter(policy_out=policyout, group__priority__in=["4", "3"])
+        for reg in regs:
+            classes = Dscp.objects.filter(regroupement_class=reg)
+            for classe in classes:
+
+                if classe.dscp_value == "AF43":
+                    print(classe.drop_min_new)
+                    classe.drop_min_old = classe.drop_min_new
+                    classe.drop_max_old = classe.drop_max_new
+                    classe.drop_min_new = str(int(classe.drop_min_new) + 1)
+                    classe.drop_max_new = str(int(classe.drop_max_new) + 1)
+
+                    TuningHistory.objects.create(tos=classe, policy_ref=policy, timestamp=datetime.now())
+                    classe.save()
+                elif classe.dscp_value == "AF33":
+                    print(classe.drop_min_new)
+                    classe.drop_min_old = classe.drop_min_new
+                    classe.drop_max_old = classe.drop_max_new
+                    classe.drop_min_new = str(int(classe.drop_min_new) + 1)
+                    classe.drop_max_new = str(int(classe.drop_max_new) + 1)
+
+                    TuningHistory.objects.create(tos=classe, policy_ref=policy, timestamp=datetime.now())
+                    classe.save()
+
+
+    # regs = RegroupementClass.objects.filter(group__priority__in=["4", "3"])
+    # for reg in regs:
+    #     print(reg.group.priority)
+    #     print(reg.oppressed_tos.dscp_value)

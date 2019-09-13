@@ -1,6 +1,5 @@
 policy-map {{a.name}}
 class {{queue.name}}
-random-detect dscp  {{ oppressed_tos.dscp_value}} {{ oppressed_tos.drop_min}} {{ oppressed_tos.drop_max}} {{ oppressed_tos.denominator}}
-random-detect dscp  {{ excessive_tos.dscp_value}} {{ excessive_tos.drop_min}} {{ excessive_tos.drop_max}} {{ excessive_tos.denominator}}
+random-detect dscp  {{ oppressed_tos.dscp_value}} {{ oppressed_tos.drop_min_new}} {{ oppressed_tos.drop_max_new}} {{ oppressed_tos.denominator}}
 exit
 exit

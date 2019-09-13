@@ -12,7 +12,7 @@ from django.urls import reverse
 
 from QoSmonitor.tasks import nbar_discovery_task
 
-from QoSmonitor.tasks import all_in_task
+from QoSmonitor.tasks import *
 from .forms import *
 from .models import *
 from QoSmonitor.models import *
@@ -733,7 +733,14 @@ def tuning(request, policy_id):
 
 
 def all_tuning(request):
+    # retrieve_monitoring()
+
     return render(request, 'all_tuning.html', locals())
+
+def run_tuning(request):
+    tuning_task()
+    return HttpResponseRedirect(reverse('all_tuning', kwargs={}))
+
 
 
 def discovery_view(request, policy_id):

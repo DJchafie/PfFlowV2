@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 import napalm
 from DynamicQoS.settings import MEDIA_ROOT
 from django.db import models
@@ -197,6 +199,7 @@ class RegroupementClass(models.Model):
     policy_out = models.ForeignKey(PolicyOut, on_delete=models.CASCADE, null=True)
     bandwidth = models.CharField(max_length=255)
     priority = models.CharField(max_length=255)
+    bits = models.IntegerField(null=True)
 
     def __str__(self):
         return self.name
@@ -674,18 +677,30 @@ class Interface(models.Model):
     def tuning(self):
         queue = self.tuning_selection()
         if queue is not None:
-            min = queue.oppressed_tos.drop_min
-            max = queue.oppressed_tos.drop_max
-            # queue.oppressed_tos.drop_min = queue.excessive_tos.drop_min
-            # queue.oppressed_tos.drop_max = queue.excessive_tos.drop_max
-            # queue.excessive_tos.drop_min = min
-            # queue.excessive_tos.drop_max = max
-            a = self.policy_out_ref
-            env = Environment(loader=FileSystemLoader(str(MEDIA_ROOT[0]) + "/monitoring_conf/"))
-            named = env.get_template("tuning.j2")
-            config_file = named.render(a=a, queue=queue, oppressed_tos=queue.oppressed_tos,
-                                       excessive_tos=queue.excessive_tos)
-            return config_file
+            queue.oppressed_tos.drop_min_old = queue.oppressed_tos.drop_min_new
+            queue.oppressed_tos.drop_max_old = queue.oppressed_tos.drop_max_new
+            min = int(queue.oppressed_tos.drop_min_new)
+            print(min+1)
+            minn=min+1
+            queue.oppressed_tos.drop_min_new = str(minn)
+            queue.oppressed_tos.drop_max_new = int(queue.oppressed_tos.drop_max_new)+1
+            queue.oppressed_tos.save()
+            print(queue.oppressed_tos.drop_min_new)
+            print(queue.oppressed_tos.drop_max_new)
+            # queue.oppressed_tos.save()
+            # a = self.policy_out_ref
+            #
+            # TuningHistory.objects.create(tos=queue.oppressed_tos, policy_ref=a.policy_ref, timestamp=datetime.now())
+            # # queue.oppressed_tos.drop_min = queue.excessive_tos.drop_min
+            # # queue.oppressed_tos.drop_max = queue.excessive_tos.drop_max
+            # # queue.excessive_tos.drop_min = min
+            # # queue.excessive_tos.drop_max = max
+            # a = self.policy_out_ref
+            # env = Environment(loader=FileSystemLoader(str(MEDIA_ROOT[0]) + "/monitoring_conf/"))
+            # named = env.get_template("tuning.j2")
+            # config_file = named.render(a=a, queue=queue, oppressed_tos=queue.oppressed_tos,
+            #                            excessive_tos=queue.excessive_tos)
+            # return config_file
         else:
             print("noting to do ")
 

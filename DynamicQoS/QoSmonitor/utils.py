@@ -34,7 +34,10 @@ def dbcollect(phb_behavior: topology, pkt):
             time = (record.LAST_SWITCHED - record.FIRST_SWITCHED) / 100
             if (time == 0):
                 time = 0.0001
-            netflow_fields_ins.bandwidth = int.from_bytes(record.IN_BYTES, 'big') * 8 / time  # bps
+                netflow_fields_ins.bandwidth = int.from_bytes(record.IN_BYTES, 'big')  # bps
+            else:
+
+                netflow_fields_ins.bandwidth = int.from_bytes(record.IN_BYTES, 'big') * 8 / time  # bps
             input_interface = monitor.get_interface_by_index(int.from_bytes(record.INPUT_SNMP, 'big'))
             netflow_fields_ins.input_int = input_interface
             output_interface = monitor.get_interface_by_index(int.from_bytes(record.OUTPUT_SNMP, 'big'))
